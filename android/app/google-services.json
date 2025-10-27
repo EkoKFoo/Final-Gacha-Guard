@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "878128902123",
+    "project_id": "gacha-guard-3b807",
+    "storage_bucket": "gacha-guard-3b807.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:878128902123:android:aa9ddf64d81070798133ae",
+        "android_client_info": {
+          "package_name": "com.ekofoo.gachaguard"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "878128902123-j5trdbdsmbfp18glrqfggojf11sv9knu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ekofoo.gachaguard",
+            "certificate_hash": "fe0aa6d2fcd9f7108bc4e1825e5e587f79fdece0"
+          }
+        },
+        {
+          "client_id": "878128902123-099iqlbl83n5ipd7tm2bgnn8oj19hu0a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBSvhECkse4sdE50JcAm-lqVdbLYLZ4jc8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "878128902123-099iqlbl83n5ipd7tm2bgnn8oj19hu0a.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "878128902123-1n9c6eauu89smvougciq9b79i886a1ln.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.ekofoo.gachaguard"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
