@@ -11,6 +11,7 @@ import 'package:gacha_guard/features/profile/profile_page.dart';
 import 'package:gacha_guard/features/auth/presentation/pages/login_page.dart';
 import 'package:gacha_guard/util/bottom_nav_helper.dart';
 import 'package:gacha_guard/features/auth/presentation/cubits/auth_cubit.dart';
+import 'package:gacha_guard/features/auth/presentation/pages/auth_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -298,6 +299,12 @@ class _ProfilePageState extends State<ProfilePage> {
               Navigator.pop(context);
               final authCubit = context.read<AuthCubit>();
               authCubit.logout();
+
+                Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const AuthPage()),
+                (route) => false,
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFD32F2F),

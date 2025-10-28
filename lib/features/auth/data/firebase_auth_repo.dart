@@ -3,11 +3,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:gacha_guard/features/auth/domain/models/app_user.dart';
 import 'package:gacha_guard/features/auth/domain/repos/auth_repo.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class FirebaseAuthRepo implements AuthRepo{
 
   // access to firebase
   final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
+  final GoogleSignIn googleSignIn = GoogleSignIn.instance;
 
   //login
   @override
@@ -48,7 +50,6 @@ class FirebaseAuthRepo implements AuthRepo{
     catch (e) {
       throw Exception('Registration failed: $e');
     }
-    ;
   }
   
   @override
@@ -86,6 +87,7 @@ class FirebaseAuthRepo implements AuthRepo{
   
   @override
   Future<void> logout() async{
+    await googleSignIn.signOut();
     await firebaseAuth.signOut();
   }
   
@@ -97,5 +99,70 @@ class FirebaseAuthRepo implements AuthRepo{
     } catch (e) {
       return "An Error Occured: $e";
     };
+  }
+
+  // GOOGLE SIGN IN
+  @override
+  Future<AppUser?> signInWithGoogle() async {
+    try {
+      // Get GoogleSignIn instance
+      final googleSignIn = GoogleSignIn.instance;
+      
+      // Initialize if needed (only once)
+      await googleSignIn.initialize();
+      
+      // Authenticate the user
+      final GoogleSignInAccount gUser = await googleSignIn.authenticate();
+      
+      // Get authentication details
+      final authentication = await gUser.authentication;
+      
+      // Get ID token (required for Firebase)
+      final String? idToken = authentication.idToken;
+      
+      if (idToken == null) {
+        throw Exception('Failed to get ID token');
+      }
+
+      // Get access token 
+      final authClient = gUser.authorizationClient;
+      final authorization = await authClient.authorizationForScopes(['email']);
+      final String? accessToken = authorization?.accessToken;
+
+      // Create Firebase credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: accessToken,
+        idToken: idToken,
+      );
+
+      // Sign in to Firebase
+      final UserCredential userCredential =
+          await firebaseAuth.signInWithCredential(credential);
+
+      // Get Firebase user
+      final firebaseUser = userCredential.user;
+
+      if (firebaseUser == null) {
+        throw Exception('Firebase user is null after sign-in');
+      }
+
+      // Create and return your AppUser
+      final appUser = AppUser(
+        uid: firebaseUser.uid,
+        email: firebaseUser.email ?? '',
+      );
+
+      return appUser;
+      
+    } on GoogleSignInException catch (e) {
+      print('Google Sign-In Error: $e');
+      return null;
+    } on FirebaseAuthException catch (e) {
+      print('Firebase Auth Error: ${e.code} - ${e.message}');
+      return null;
+    } catch (e) {
+      print('Error during Google sign-in: $e');
+      return null;
+    }
   }
 }
