@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:gacha_guard/features/expenditure/manage_expenditure_page.dart';
 import 'package:gacha_guard/features/profile/profile_page.dart';
 import 'package:gacha_guard/util/bottom_nav_helper.dart';
@@ -14,11 +16,49 @@ class _BudgetPageState extends State<BudgetPage> {
   double _budgetAmount = 2500.0;
   String _selectedPeriod = 'Monthly';
   final TextEditingController _amountController = TextEditingController();
+  bool _isLoading = true;
+  String? _uid;
 
   @override
   void initState() {
     super.initState();
-    _amountController.text = _budgetAmount.toStringAsFixed(0);
+    _loadUserBudget();
+  }
+
+  Future<void> _loadUserBudget() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        _uid = user.uid;
+        
+        final doc = await FirebaseFirestore.instance
+            .collection('budgets')
+            .doc(user.uid)
+            .get();
+        
+        if (doc.exists) {
+          final data = doc.data() as Map<String, dynamic>;
+          setState(() {
+            _budgetAmount = (data['budgetLimit'] ?? 2500.0).toDouble();
+            _selectedPeriod = data['budgetType'] ?? 'Monthly';
+            _amountController.text = _budgetAmount.toStringAsFixed(0);
+          });
+        } else {
+          _amountController.text = _budgetAmount.toStringAsFixed(0);
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading budget: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   void _updateBudgetFromSlider(double value) {
@@ -37,19 +77,120 @@ class _BudgetPageState extends State<BudgetPage> {
     }
   }
 
-  void _saveChanges() {
-    // Show success message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Budget settings saved successfully!'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      ),
-    );
+  DateTime _calculateStartDate() {
+    final now = DateTime.now();
+    switch (_selectedPeriod) {
+      case 'Daily':
+        return DateTime(now.year, now.month, now.day);
+      case 'Weekly':
+        // Start of current week (Monday)
+        final weekday = now.weekday;
+        return now.subtract(Duration(days: weekday - 1));
+      case 'Monthly':
+      default:
+        return DateTime(now.year, now.month, 1);
+    }
+  }
+
+  DateTime _calculateLastDate() {
+    final startDate = _calculateStartDate();
+    switch (_selectedPeriod) {
+      case 'Daily':
+        return DateTime(startDate.year, startDate.month, startDate.day, 23, 59, 59);
+      case 'Weekly':
+        return startDate.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+      case 'Monthly':
+      default:
+        // Last day of the month
+        final nextMonth = DateTime(startDate.year, startDate.month + 1, 1);
+        return nextMonth.subtract(const Duration(seconds: 1));
+    }
+  }
+
+  DateTime _calculateResetDate() {
+    final lastDate = _calculateLastDate();
+    switch (_selectedPeriod) {
+      case 'Daily':
+        return lastDate.add(const Duration(seconds: 1));
+      case 'Weekly':
+        return lastDate.add(const Duration(seconds: 1));
+      case 'Monthly':
+      default:
+        return lastDate.add(const Duration(seconds: 1));
+    }
+  }
+
+  Future<void> _saveChanges() async {
+    if (_uid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User not logged in'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final startDate = _calculateStartDate();
+      final lastDate = _calculateLastDate();
+      final resetDate = _calculateResetDate();
+
+      await FirebaseFirestore.instance
+          .collection('budgets')
+          .doc(_uid)
+          .set({
+        'uid': _uid,
+        'budgetType': _selectedPeriod,
+        'budgetLimit': _budgetAmount,
+        'budgetStartDate': Timestamp.fromDate(startDate),
+        'budgetLastDate': Timestamp.fromDate(lastDate),
+        'budgetResetDate': Timestamp.fromDate(resetDate),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Budget settings saved successfully!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving budget: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.grey[50],
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: const SizedBox(),
+          title: const Text(
+            'Budget Settings',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          centerTitle: true,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -158,7 +299,7 @@ class _BudgetPageState extends State<BudgetPage> {
                           child: Row(
                             children: [
                               const Text(
-                                '\$',
+                                'RM',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w500,
@@ -265,67 +406,6 @@ class _BudgetPageState extends State<BudgetPage> {
         ],
       ),
       bottomNavigationBar: const BottomNavHelper(currentIndex: 3),
-      // BottomNavigationBar(
-      //   type: BottomNavigationBarType.fixed,
-      //   currentIndex: 3, // Change this per page: 0=Insight, 1=Expenditures, 2=Home, 3=Budget, 4=Profile
-      //   selectedItemColor: Colors.blue,
-      //   unselectedItemColor: Colors.grey,
-      //   selectedFontSize: 12,
-      //   unselectedFontSize: 12,
-      //   onTap: (index) {
-      //     // Navigate based on the tapped index
-      //     switch (index) {
-      //       case 0:
-      //         // Navigate to Insight page
-      //         // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => InsightPage()));
-      //         break;
-      //       case 1:
-      //         // Navigate to Expenditures page
-      //         Navigator.pushReplacement(
-      //           context,
-      //           MaterialPageRoute(builder: (context) => const ManageExpenditurePage()),
-      //         );
-      //         break;
-      //       case 2:
-      //         // Navigate to Home page
-      //         // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
-      //         break;
-      //       case 3:
-      //         // Navigate to Budget page
-      //         Navigator.pushReplacement(
-      //           context,
-      //           MaterialPageRoute(builder: (context) => const BudgetPage()),
-      //         );
-      //         break;
-      //       case 4:
-      //         // Navigate to Profile page
-      //         Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => ProfilePage()));
-      //         break;
-      //     }
-      //   },
-      //   items: const [
-      //     BottomNavigationBarItem(
-      //       icon: Icon(Icons.trending_up),
-      //       label: 'Insight',
-      //     ),
-      //     BottomNavigationBarItem(
-      //       icon: Icon(Icons.receipt_long),
-      //       label: 'Expenditures',
-      //     ),
-      //     BottomNavigationBarItem(
-      //       icon: Icon(Icons.home),
-      //       label: 'Home',
-      //     ),
-      //     BottomNavigationBarItem(
-      //       icon: Icon(Icons.account_balance_wallet),
-      //       label: 'Budget',
-      //     ),
-      //     BottomNavigationBarItem(
-      //       icon: Icon(Icons.person),
-      //       label: 'Profile',
-      //     ),
-      //   ],
-      // ),
     );
   }
 

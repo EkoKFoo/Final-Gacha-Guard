@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:gacha_guard/features/auth/domain/models/app_user.dart';
 import 'package:gacha_guard/features/auth/domain/repos/auth_repo.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class FirebaseAuthRepo implements AuthRepo{
 
@@ -32,7 +33,7 @@ class FirebaseAuthRepo implements AuthRepo{
         throw Exception('Login Failed: $e');
     }
   }
-
+  //register
   @override
   Future<AppUser?> registerWithEmailPassword(
     String name, String email, String password) async{
@@ -44,6 +45,21 @@ class FirebaseAuthRepo implements AuthRepo{
       //create user
       AppUser user = AppUser(uid: userCredential.user!.uid, email: email);
 
+      //save user data in firestore
+      await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userCredential.user!.uid)
+        .set({
+        'uid': userCredential.user!.uid,
+        'email': email,
+        'name': name,
+        'phone': '',
+        'photo': null, 
+        'createdAt': FieldValue.serverTimestamp(),
+        'notification': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+        });
+
       //return user
       return user;
     } 
@@ -51,7 +67,7 @@ class FirebaseAuthRepo implements AuthRepo{
       throw Exception('Registration failed: $e');
     }
   }
-  
+  //delete Account
   @override
   Future<void> deleteAccount() async{
     try {
@@ -72,7 +88,7 @@ class FirebaseAuthRepo implements AuthRepo{
     
     ;
   }
-  
+  //get current user
   @override
   Future<AppUser?> getCurrentUser() async{
     //get current logged in user from firebase
@@ -84,13 +100,13 @@ class FirebaseAuthRepo implements AuthRepo{
     //loggedin user exists
     return AppUser(uid: firebaseUser.uid, email: firebaseUser.email!);
   }
-  
+  //logout
   @override
   Future<void> logout() async{
     await googleSignIn.signOut();
     await firebaseAuth.signOut();
   }
-  
+  //password reset email
   @override
   Future<String> sendPasswordResetEmail(String email) async{
     try {
@@ -101,8 +117,7 @@ class FirebaseAuthRepo implements AuthRepo{
     };
   }
 
-  // GOOGLE SIGN IN
-  @override
+    @override
   Future<AppUser?> signInWithGoogle() async {
     try {
       // Get GoogleSignIn instance
@@ -146,6 +161,37 @@ class FirebaseAuthRepo implements AuthRepo{
         throw Exception('Firebase user is null after sign-in');
       }
 
+      // Check if user document exists in Firestore
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(firebaseUser.uid)
+          .get();
+
+      // If user doesn't exist, create new document
+      if (!userDoc.exists) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(firebaseUser.uid)
+            .set({
+          'uid': firebaseUser.uid,
+          'email': firebaseUser.email ?? '',
+          'name': firebaseUser.displayName ?? '',
+          'phone': '',
+          'photo': firebaseUser.photoURL,
+          'createdAt': FieldValue.serverTimestamp(),
+          'notification': true,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Update existing user's updatedAt timestamp
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(firebaseUser.uid)
+            .update({
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
       // Create and return your AppUser
       final appUser = AppUser(
         uid: firebaseUser.uid,
@@ -154,15 +200,9 @@ class FirebaseAuthRepo implements AuthRepo{
 
       return appUser;
       
-    } on GoogleSignInException catch (e) {
-      print('Google Sign-In Error: $e');
-      return null;
-    } on FirebaseAuthException catch (e) {
-      print('Firebase Auth Error: ${e.code} - ${e.message}');
-      return null;
-    } catch (e) {
-      print('Error during Google sign-in: $e');
-      return null;
+    } 
+    catch (e) {
+        throw Exception('Login Failed: $e');
     }
   }
 }
