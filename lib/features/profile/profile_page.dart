@@ -403,7 +403,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ElevatedButton(
               onPressed: isDeleting ? null : () async {
                 if (passwordController.text.isEmpty) {
-                  ScaffoldMessenger.of(this.context).showSnackBar(
+                  ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Please enter your password'),
                       backgroundColor: Colors.red,
@@ -427,56 +427,68 @@ class _ProfilePageState extends State<ProfilePage> {
                   );
                   await user.reauthenticateWithCredential(credential);
 
-                  // Delete user data from Firestore
-                  await FirebaseFirestore.instance
+                  final firestore = FirebaseFirestore.instance;
+
+                  // Delete expenditures subcollection
+                  final expenditures = await firestore
                       .collection('users')
                       .doc(user.uid)
-                      .delete();
-
-                  // Delete budget data
-                  final budgetSnapshot = await FirebaseFirestore.instance
-                      .collection('budgets')
-                      .where('userId', isEqualTo: user.uid)
-                      .get();
-                  for (var doc in budgetSnapshot.docs) {
-                    await doc.reference.delete();
-                  }
-
-                  // Delete expenditure data
-                  final expenditureSnapshot = await FirebaseFirestore.instance
                       .collection('expenditures')
-                      .where('userId', isEqualTo: user.uid)
                       .get();
-                  for (var doc in expenditureSnapshot.docs) {
+                  for (var doc in expenditures.docs) {
                     await doc.reference.delete();
                   }
 
-                  // Delete the user account
+                  // Delete budget subcollection
+                  final budgets = await firestore
+                      .collection('users')
+                      .doc(user.uid)
+                      .collection('budget')
+                      .get();
+                  for (var doc in budgets.docs) {
+                    await doc.reference.delete();
+                  }
+
+                  // Delete alerts subcollection if exists
+                  final alerts = await firestore
+                      .collection('users')
+                      .doc(user.uid)
+                      .collection('alerts')
+                      .get();
+                  for (var doc in alerts.docs) {
+                    await doc.reference.delete();
+                  }
+
+                  // Delete main user document
+                  await firestore.collection('users').doc(user.uid).delete();
+
+                  // Delete Firebase Auth user
                   await user.delete();
 
-                  // Close dialog and navigate to auth page
+                  // Close dialog
                   passwordController.dispose();
                   Navigator.pop(dialogContext);
 
-                  // Logout and navigate
+                  // Logout and navigate to auth page
                   final authCubit = context.read<AuthCubit>();
                   authCubit.logout();
 
                   Navigator.pushAndRemoveUntil(
-                    this.context,
+                    context,
                     MaterialPageRoute(builder: (_) => const AuthPage()),
                     (route) => false,
                   );
 
                   // Show success message on new page
                   Future.delayed(const Duration(milliseconds: 500), () {
-                    ScaffoldMessenger.of(this.context).showSnackBar(
+                    ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Account deleted successfully'),
                         backgroundColor: Colors.green,
                       ),
                     );
                   });
+
                 } on FirebaseAuthException catch (e) {
                   setState(() => isDeleting = false);
                   String message;
@@ -490,7 +502,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     default:
                       message = 'Error: ${e.message}';
                   }
-                  ScaffoldMessenger.of(this.context).showSnackBar(
+                  ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(message),
                       backgroundColor: Colors.red,
@@ -498,7 +510,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   );
                 } catch (e) {
                   setState(() => isDeleting = false);
-                  ScaffoldMessenger.of(this.context).showSnackBar(
+                  ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Error deleting account: $e'),
                       backgroundColor: Colors.red,

@@ -103,9 +103,23 @@ class FirebaseAuthRepo implements AuthRepo{
   //logout
   @override
   Future<void> logout() async{
-    await googleSignIn.signOut();
-    await firebaseAuth.signOut();
+    final user = firebaseAuth.currentUser;
+
+    if (user != null) {
+      try {
+        // Only sign out from Google if the user signed in with Google
+        if (user.providerData.any((p) => p.providerId == 'google.com')) {
+          await googleSignIn.signOut();
+        }
+
+        // Sign out from Firebase
+        await firebaseAuth.signOut();
+      } catch (e) {
+        throw Exception('Logout failed: $e');
+      }
+    }
   }
+  
   //password reset email
   @override
   Future<String> sendPasswordResetEmail(String email) async{

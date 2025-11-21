@@ -2,7 +2,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:gacha_guard/features/auth/presentation/cubits/auth_cubit.dart';
-import 'package:gacha_guard/services/auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'auth_page.dart';
 import 'package:gacha_guard/features/auth/presentation/components/custom_text_field.dart';
@@ -163,7 +162,7 @@ class _SignUpPageState extends State<SignUpPage> {
                           ),
                           onPressed: () {
                           setState(() {
-                          _obscurePassword = !_obscurePassword; // toggle visibility
+                          _obscurePassword = !_obscurePassword;
                               }
                             );
                           },
@@ -182,7 +181,7 @@ class _SignUpPageState extends State<SignUpPage> {
                           ),
                           onPressed: () {
                           setState(() {
-                          _obscureConfirmPassword = !_obscureConfirmPassword; // toggle visibility
+                          _obscureConfirmPassword = !_obscureConfirmPassword;
                               }
                             );
                           },

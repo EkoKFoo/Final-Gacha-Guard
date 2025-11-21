@@ -13,13 +13,12 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   bool _obscureCurrentPassword = true;
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
 
-  // Password strength indicator
   double _passwordStrength = 0.0;
   String _passwordStrengthText = '';
   Color _passwordStrengthColor = Colors.grey;
@@ -56,11 +55,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       text = 'Weak';
       color = Colors.orange;
     } else {
-      // Check for mixed case, numbers, special chars
       bool hasUppercase = password.contains(RegExp(r'[A-Z]'));
       bool hasLowercase = password.contains(RegExp(r'[a-z]'));
       bool hasDigits = password.contains(RegExp(r'[0-9]'));
-      bool hasSpecialCharacters = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
+      bool hasSpecialCharacters =
+          password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
 
       int criteriaCount = 0;
       if (hasUppercase) criteriaCount++;
@@ -93,8 +92,13 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   Future<void> _changePassword() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_passwordStrength < 0.5) {
+      _showSnackBar('Password is too weak', isError: true);
+      return;
+    }
+
     setState(() => _isLoading = true);
-    
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null || user.email == null) {
@@ -106,19 +110,27 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         email: user.email!,
         password: _currentPasswordController.text,
       );
-      
       await user.reauthenticateWithCredential(credential);
-      
+
       // Update password
       await user.updatePassword(_newPasswordController.text);
-      
-      _showSnackBar('Password changed successfully! You can now use your new password.');
-      
-      // Wait a moment before navigating back
+
+      _showSnackBar(
+          'Password changed successfully! You can now use your new password.');
+
+      // Reset form
+      _formKey.currentState!.reset();
+      _currentPasswordController.clear();
+      _newPasswordController.clear();
+      _confirmPasswordController.clear();
+      setState(() {
+        _passwordStrength = 0.0;
+        _passwordStrengthText = '';
+        _passwordStrengthColor = Colors.grey;
+      });
+
       await Future.delayed(const Duration(seconds: 1));
-      if (mounted) {
-        Navigator.pop(context);
-      }
+      if (mounted) Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       String message;
       switch (e.code) {
@@ -129,7 +141,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
           message = 'New password is too weak. Please use a stronger password.';
           break;
         case 'requires-recent-login':
-          message = 'For security reasons, please logout and login again before changing your password.';
+          message =
+              'For security reasons, please logout and login again before changing your password.';
           break;
         case 'network-request-failed':
           message = 'Network error. Please check your connection and try again.';
@@ -139,15 +152,15 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       }
       _showSnackBar(message, isError: true);
     } catch (e) {
-      _showSnackBar('An unexpected error occurred. Please try again.', isError: true);
+      _showSnackBar('An unexpected error occurred. Please try again.',
+          isError: true);
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -173,6 +186,132 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         margin: const EdgeInsets.all(16),
         duration: Duration(seconds: isError ? 4 : 2),
       ),
+    );
+  }
+
+  void _showForgotPasswordDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Forgot Password?',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
+        content: const Text(
+          'If you forgot your current password, you can send a password reset email to your registered email address.',
+          style: TextStyle(fontSize: 15, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _sendPasswordResetEmail();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6750A4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Send Reset Email',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _sendPasswordResetEmail() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && user.email != null) {
+      try {
+        await FirebaseAuth.instance.sendPasswordResetEmail(email: user.email!);
+        _showSnackBar('Password reset email sent to ${user.email}');
+      } catch (e) {
+        _showSnackBar('Failed to send reset email', isError: true);
+      }
+    }
+  }
+
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String label,
+    required bool obscureText,
+    required VoidCallback onToggleVisibility,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          obscureText: obscureText,
+          validator: validator,
+          decoration: InputDecoration(
+            prefixIcon: Icon(Icons.lock_outline, color: Colors.grey.shade600),
+            suffixIcon: IconButton(
+              icon: Icon(
+                obscureText
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                color: Colors.grey.shade600,
+              ),
+              onPressed: onToggleVisibility,
+            ),
+            filled: true,
+            fillColor: Colors.grey.shade50,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF6750A4), width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.red),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.red, width: 2),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -248,14 +387,14 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                
-                // Current Password
+
                 _buildPasswordField(
                   controller: _currentPasswordController,
                   label: 'Current Password',
                   obscureText: _obscureCurrentPassword,
                   onToggleVisibility: () {
-                    setState(() => _obscureCurrentPassword = !_obscureCurrentPassword);
+                    setState(() =>
+                        _obscureCurrentPassword = !_obscureCurrentPassword);
                   },
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -265,8 +404,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   },
                 ),
                 const SizedBox(height: 24),
-                
-                // New Password
+
                 _buildPasswordField(
                   controller: _newPasswordController,
                   label: 'New Password',
@@ -286,9 +424,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                     }
                     return null;
                   },
-                  showStrengthIndicator: true,
                 ),
-                
+
                 // Password Strength Indicator
                 if (_newPasswordController.text.isNotEmpty) ...[
                   const SizedBox(height: 12),
@@ -317,16 +454,16 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                     ],
                   ),
                 ],
-                
+
                 const SizedBox(height: 24),
-                
-                // Confirm New Password
+
                 _buildPasswordField(
                   controller: _confirmPasswordController,
                   label: 'Confirm New Password',
                   obscureText: _obscureConfirmPassword,
                   onToggleVisibility: () {
-                    setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
+                    setState(
+                        () => _obscureConfirmPassword = !_obscureConfirmPassword);
                   },
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -339,8 +476,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   },
                 ),
                 const SizedBox(height: 40),
-                
-                // Change Password Button
+
                 SizedBox(
                   width: double.infinity,
                   height: 48,
@@ -373,15 +509,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                           ),
                   ),
                 ),
-                
                 const SizedBox(height: 16),
-                
-                // Forgot Password Link
+
                 Center(
                   child: TextButton(
-                    onPressed: () {
-                      _showForgotPasswordDialog();
-                    },
+                    onPressed: _showForgotPasswordDialog,
                     child: Text(
                       'Forgot current password?',
                       style: TextStyle(
@@ -396,120 +528,6 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildPasswordField({
-    required TextEditingController controller,
-    required String label,
-    required bool obscureText,
-    required VoidCallback onToggleVisibility,
-    String? Function(String?)? validator,
-    bool showStrengthIndicator = false,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          obscureText: obscureText,
-          validator: validator,
-          decoration: InputDecoration(
-            prefixIcon: Icon(Icons.lock_outline, color: Colors.grey.shade600),
-            suffixIcon: IconButton(
-              icon: Icon(
-                obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                color: Colors.grey.shade600,
-              ),
-              onPressed: onToggleVisibility,
-            ),
-            filled: true,
-            fillColor: Colors.grey.shade50,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFF6750A4), width: 2),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.red),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.red, width: 2),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showForgotPasswordDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: const Text(
-          'Forgot Password?',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
-        ),
-        content: const Text(
-          'If you forgot your current password, you\'ll need to logout and use the "Forgot Password" option on the login screen to reset it.',
-          style: TextStyle(fontSize: 15, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Go back to profile
-              // User can then logout from profile page
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6750A4),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text(
-              'Go to Profile',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

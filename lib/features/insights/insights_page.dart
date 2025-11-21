@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:gacha_guard/route.dart';
-import 'package:gacha_guard/features/budget/budget_page.dart';
-import 'package:gacha_guard/features/expenditure/manage_expenditure_page.dart';
-import 'package:gacha_guard/features/insights/insights_page.dart';
-import 'package:gacha_guard/features/profile/profile_page.dart';
-import 'package:gacha_guard/features/home/home_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:gacha_guard/util/bottom_nav_helper.dart';
+import 'package:gacha_guard/services/notification_service.dart';
+import 'package:gacha_guard/services/scheduled_notification_service.dart';
 
 class InsightsPage extends StatefulWidget {
   const InsightsPage({Key? key}) : super(key: key);
@@ -15,18 +14,152 @@ class InsightsPage extends StatefulWidget {
 }
 
 class _InsightsPageState extends State<InsightsPage> {
-    int _selectedIndex = 2;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  void _onItemTapped(int index) {
-    if (index == _selectedIndex) return;
-    
-    setState(() {
-      _selectedIndex = index;
-    });
+  double _budgetLimit = 0.0;
+  double _totalSpent = 0.0;
+  bool _isLoading = true;
+
+  YoutubePlayerController? _youtubeController;
+  bool _youtubeError = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize YouTube player safely
+    _youtubeController = YoutubePlayerController(
+      initialVideoId: '1EE-3lk0_7M',
+      flags: const YoutubePlayerFlags(
+        autoPlay: false,
+        mute: false,
+      ),
+    )..addListener(() {
+        if (_youtubeController!.value.hasError) {
+          setState(() {
+            _youtubeError = true;
+          });
+        }
+      });
+
+    _loadUserData();
+  }
+
+  @override
+  void dispose() {
+    _youtubeController?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadUserData() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final budgetDoc = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('budget')
+          .doc('main')
+          .get();
+
+      if (budgetDoc.exists) {
+        _budgetLimit = budgetDoc['budgetLimit'] ?? 0.0;
+      }
+
+      final expenditureSnapshot = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('expenditures')
+          .get();
+
+      double total = 0.0;
+      for (var doc in expenditureSnapshot.docs) {
+        total += (doc['amount'] ?? 0.0);
+      }
+
+      setState(() {
+        _totalSpent = total;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  double get spendingRatio => _budgetLimit > 0 ? _totalSpent / _budgetLimit : 0;
+
+  List<Map<String, String>> getRecommendations() {
+    if (spendingRatio < 0.5) {
+      return [
+        {
+          'title': 'Well Managed Spending',
+          'description': 'You’re managing your budget well — keep it up!',
+        },
+        {
+          'title': 'Track Your Expenses',
+          'description': 'Continue tracking your expenses regularly.',
+        },
+        {
+          'title': 'Save Remaining Budget',
+          'description': 'Consider saving the remaining budget early.',
+        },
+      ];
+    } else if (spendingRatio < 0.8) {
+      return [
+        {
+          'title': 'Half Budget Used',
+          'description': 'You’ve used over half your budget — review your remaining expenses.',
+        },
+        {
+          'title': 'Set Alerts',
+          'description': 'Set alerts to remind you before reaching your budget limit.',
+        },
+        {
+          'title': 'Plan Purchases',
+          'description': 'Plan your next purchases carefully to avoid overspending.',
+        },
+      ];
+    } else {
+      return [
+        {
+          'title': 'Budget Exceeded',
+          'description': 'You’ve exceeded your budget limit! Pause non-essential spending.',
+        },
+        {
+          'title': 'Review Transactions',
+          'description': 'Check your spending categories to identify overspending.',
+        },
+        {
+          'title': 'Adjust Next Budget',
+          'description': 'Consider adjusting next month’s budget based on current patterns.',
+        },
+      ];
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final recommendations = getRecommendations();
+    final bool exceededBudget = spendingRatio >= 1.0;
+
+    double screenWidth = MediaQuery.of(context).size.width;
+    double videoHeight = screenWidth < 600
+        ? 200
+        : screenWidth < 1200
+            ? 300
+            : 400;
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -60,330 +193,120 @@ class _InsightsPageState extends State<InsightsPage> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Alert Card
-            Container(
-              padding: const EdgeInsets.all(20.0),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFE53935), Color(0xFFD32F2F)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.red.withOpacity(0.3),
-                    spreadRadius: 1,
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.white, width: 2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.warning_amber_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          'Unusual Spending Spike Detected!',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'We\'ve noticed a significant increase in your spending this month. Review your transactions and adjust your budget to stay on track.',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Review Budget',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: const BorderSide(color: Colors.white, width: 2),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        'Set Cooldown Timer',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            
-            // Awareness & Education Section
+            if (spendingRatio >= 0.8) _buildAlertCard(exceededBudget),
+            const SizedBox(height: 16),
+
+            // YouTube Video Section with error handling
             const Text(
-              'Awareness & Education',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              'Awareness Video',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildVideoCard(
-                    'assets/video_thumb1.jpg',
-                    'Mastering Your Monthly Budget',
-                    '5:30',
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildVideoCard(
-                    'assets/video_thumb2.jpg',
-                    '10 Simple Ways to Boost Your Savings',
-                    '7:15',
-                  ),
-                ),
-              ],
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: double.infinity,
+                height: videoHeight,
+                child: _youtubeController == null
+                    ? Container(
+                        color: Colors.grey[200],
+                        child: const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    : _youtubeError
+                        ? Container(
+                            color: Colors.grey[200],
+                            child: const Center(
+                              child: Text(
+                                "Video unavailable. Please check your internet connection.",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    fontSize: 14, color: Colors.red),
+                              ),
+                            ),
+                          )
+                        : YoutubePlayerBuilder(
+                            player: YoutubePlayer(
+                              controller: _youtubeController!,
+                              showVideoProgressIndicator: true,
+                              progressColors: const ProgressBarColors(
+                                playedColor: Colors.blue,
+                                handleColor: Colors.blueAccent,
+                              ),
+                            ),
+                            builder: (context, player) => player,
+                          ),
+              ),
             ),
             const SizedBox(height: 24),
-            
-            // Helpful Tips & Recommendations Section
+
+            // Recommendations
             const Text(
               'Helpful Tips & Recommendations',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            ...recommendations.map(
+              (rec) => _buildTipCard(
+                Icons.lightbulb_outline,
+                rec['title']!,
+                rec['description']!,
               ),
             ),
-            const SizedBox(height: 12),
-            _buildTipCard(
-              Icons.lightbulb_outline,
-              'Review Your Subscription Spend',
-              'Many people overspend on unused subscriptions. A quick review can save you money!',
-              'View Details',
-            ),
-            const SizedBox(height: 12),
-            _buildTipCard(
-              Icons.notifications_active_outlined,
-              'Set Spending Alerts',
-              'Get notified when you\'re approaching your budget limit to avoid overspending.',
-              'Enable Alerts',
-            ),
-            const SizedBox(height: 12),
-            _buildTipCard(
-              Icons.savings_outlined,
-              'Create a Savings Goal',
-              'Setting specific savings goals can help you stay motivated and track your progress.',
-              'Set Goal',
-            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
-        bottomNavigationBar: const BottomNavHelper(currentIndex: 0),
-      //   BottomNavigationBar(
-      //   currentIndex: _selectedIndex,
-      //   onTap: (index) {
-      //     if (index == _selectedIndex) return; // prevent reloading same page
-
-      //     setState(() {
-      //       _selectedIndex = index;
-      //     });
-
-      //     switch (index) {
-      //       case 0:
-      //         NavigationHelper.pushReplacement(context, const InsightsPage());
-      //         break;
-      //       case 1:
-      //         NavigationHelper.pushReplacement(context, const ManageExpenditurePage());
-      //         break;
-      //       case 2:
-      //         NavigationHelper.pushReplacement(context, const HomePage());
-      //         break;
-      //       case 3:
-      //         NavigationHelper.pushReplacement(context, const BudgetPage());
-      //         break;
-      //       case 4:
-      //         NavigationHelper.pushReplacement(context, const ProfilePage());
-      //         break;
-      //     }
-      //   },
-      //   type: BottomNavigationBarType.fixed,
-      //   backgroundColor: Colors.white,
-      //   selectedItemColor: const Color(0xFF7B88FF),
-      //   unselectedItemColor: Colors.grey,
-      //   selectedFontSize: 11,
-      //   unselectedFontSize: 11,
-      //   elevation: 0,
-      //   items: const [
-      //     BottomNavigationBarItem(
-      //       icon: Icon(Icons.show_chart),
-      //       label: 'Insight',
-      //     ),
-      //     BottomNavigationBarItem(
-      //       icon: Icon(Icons.receipt_long),
-      //       label: 'Expenditures',
-      //     ),
-      //     BottomNavigationBarItem(
-      //       icon: Icon(Icons.home),
-      //       label: 'Home',
-      //     ),
-      //     BottomNavigationBarItem(
-      //       icon: Icon(Icons.account_balance_wallet),
-      //       label: 'Budget',
-      //     ),
-      //     BottomNavigationBarItem(
-      //       icon: Icon(Icons.person),
-      //       label: 'Profile',
-      //     ),
-      //   ],
-      // ),
+      bottomNavigationBar: const BottomNavHelper(currentIndex: 0),
     );
   }
 
-  Widget _buildVideoCard(String imagePath, String title, String duration) {
+  Widget _buildAlertCard(bool exceeded) {
     return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 4,
-          ),
-        ],
+        gradient: LinearGradient(
+          colors: exceeded
+              ? [Colors.red.shade700, Colors.red.shade400]
+              : [Colors.orange.shade600, Colors.orange.shade400],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          // Video Thumbnail
-          Container(
-            height: 120,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
+          Icon(
+            exceeded ? Icons.error_outline : Icons.warning_amber_rounded,
+            color: Colors.white,
+            size: 28,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              exceeded
+                  ? ' You’ve exceeded your budget! Reduce spending now.'
+                  : ' You’ve used over 80% of your budget — monitor your spending.',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                height: 1.4,
               ),
             ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Placeholder for video thumbnail
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.grey[400]!, Colors.grey[300]!],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                ),
-                // Play button
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow,
-                    color: Colors.black87,
-                    size: 28,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Video Info
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    height: 1.3,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  duration,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTipCard(IconData icon, String title, String description, String buttonText) {
+  Widget _buildTipCard(IconData icon, String title, String description) {
     return Container(
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -417,10 +340,8 @@ class _InsightsPageState extends State<InsightsPage> {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style:
+                      const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
@@ -428,30 +349,7 @@ class _InsightsPageState extends State<InsightsPage> {
           const SizedBox(height: 12),
           Text(
             description,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: () {},
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF7B88FF),
-              side: const BorderSide(color: Color(0xFF7B88FF)),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: Text(
-              buttonText,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.4),
           ),
         ],
       ),

@@ -27,17 +27,19 @@ class _BudgetPageState extends State<BudgetPage> {
 
   Future<void> _loadUserBudget() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         _uid = user.uid;
-        
+
         final doc = await FirebaseFirestore.instance
-            .collection('budgets')
-            .doc(user.uid)
+            .collection('users')
+            .doc(_uid)
+            .collection('budget')
+            .doc('main') // access the single budget document
             .get();
-        
+
         if (doc.exists) {
           final data = doc.data() as Map<String, dynamic>;
           setState(() {
@@ -46,7 +48,10 @@ class _BudgetPageState extends State<BudgetPage> {
             _amountController.text = _budgetAmount.toStringAsFixed(0);
           });
         } else {
-          _amountController.text = _budgetAmount.toStringAsFixed(0);
+          // default if user has no budget document yet
+          setState(() {
+            _amountController.text = _budgetAmount.toStringAsFixed(0);
+          });
         }
       }
     } catch (e) {
@@ -70,7 +75,7 @@ class _BudgetPageState extends State<BudgetPage> {
 
   void _updateBudgetFromTextField(String value) {
     final parsedValue = double.tryParse(value);
-    if (parsedValue != null && parsedValue >= 0 && parsedValue <= 10000) {
+    if (parsedValue != null && parsedValue >= 0 && parsedValue <= 100000) {
       setState(() {
         _budgetAmount = parsedValue;
       });
@@ -136,22 +141,40 @@ class _BudgetPageState extends State<BudgetPage> {
       final lastDate = _calculateLastDate();
       final resetDate = _calculateResetDate();
 
-      await FirebaseFirestore.instance
-          .collection('budgets')
+      final budgetRef = FirebaseFirestore.instance
+          .collection('users')
           .doc(_uid)
-          .set({
-        'uid': _uid,
-        'budgetType': _selectedPeriod,
-        'budgetLimit': _budgetAmount,
-        'budgetStartDate': Timestamp.fromDate(startDate),
-        'budgetLastDate': Timestamp.fromDate(lastDate),
-        'budgetResetDate': Timestamp.fromDate(resetDate),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+          .collection('budget')
+          .doc('main'); // only one budget per user
+
+      final budgetDoc = await budgetRef.get();
+
+      if (budgetDoc.exists) {
+        // Update existing budget
+        await budgetRef.update({
+          'budgetType': _selectedPeriod,
+          'budgetLimit': _budgetAmount,
+          'budgetStartDate': Timestamp.fromDate(startDate),
+          'budgetLastDate': Timestamp.fromDate(lastDate),
+          'budgetResetDate': Timestamp.fromDate(resetDate),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Create new budget (first time)
+        await budgetRef.set({
+          'budgetType': _selectedPeriod,
+          'budgetLimit': _budgetAmount,
+          'budgetStartDate': Timestamp.fromDate(startDate),
+          'budgetLastDate': Timestamp.fromDate(lastDate),
+          'budgetResetDate': Timestamp.fromDate(resetDate),
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Budget settings saved successfully!'),
+          content: Text('Budget limit saved successfully!'),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 2),
         ),
@@ -165,6 +188,7 @@ class _BudgetPageState extends State<BudgetPage> {
       );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -198,7 +222,7 @@ class _BudgetPageState extends State<BudgetPage> {
         elevation: 0,
         leading: const SizedBox(),
         title: const Text(
-          'Budget Settings',
+          'Set Budget Limit',
           style: TextStyle(
             color: Colors.black,
             fontSize: 18,
@@ -281,7 +305,7 @@ class _BudgetPageState extends State<BudgetPage> {
                           child: Slider(
                             value: _budgetAmount,
                             min: 0,
-                            max: 10000,
+                            max: 100000,
                             onChanged: _updateBudgetFromSlider,
                           ),
                         ),
