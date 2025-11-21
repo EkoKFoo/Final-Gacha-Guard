@@ -13,7 +13,6 @@ class Transaction {
   final double amount;
   final String category;
   final String merchant;
-  final String uid;
 
   Transaction({
     required this.eid,
@@ -23,7 +22,6 @@ class Transaction {
     required this.amount,
     required this.category,
     required this.merchant,
-    required this.uid,
   });
 
   factory Transaction.fromFirestore(DocumentSnapshot doc) {
@@ -36,7 +34,6 @@ class Transaction {
       amount: (data['amount'] ?? 0.0).toDouble(),
       category: data['category'] ?? '',
       merchant: data['merchant'] ?? '',
-      uid: data['uid'] ?? '', // Foreign key to users collection
     );
   }
 
@@ -48,7 +45,6 @@ class Transaction {
       'amount': amount,
       'category': category,
       'merchant': merchant,
-      'uid': uid, // Foreign key
     };
   }
 
@@ -100,88 +96,64 @@ class _ManageExpenditurePageState extends State<ManageExpenditurePage> {
     _loadExpenditures();
   }
 
-  Future<void> _loadExpenditures() async {
-    try {
-      final User? currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
+Future<void> _loadExpenditures() async {
+  try {
+    final User? currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
 
-      // Query expenditures collection where uid matches current user (foreign key)
-      final QuerySnapshot snapshot = await _firestore
-          .collection('expenditure')
-          .where('uid', isEqualTo: currentUser.uid)
-          .get();
+    // Load expenditures from nested user collection
+    final QuerySnapshot snapshot = await _firestore
+        .collection('users')
+        .doc(currentUser.uid)
+        .collection('expenditures')
+        .get();
 
-      setState(() {
-        _transactions = snapshot.docs
-            .map((doc) => Transaction.fromFirestore(doc))
-            .toList();
-        _applyFiltersAndSort();
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error loading expenditures: $e');
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to load expenditures: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    setState(() {
+      _transactions = snapshot.docs
+          .map((doc) => Transaction.fromFirestore(doc))
+          .toList();
+      _applyFiltersAndSort();
+      _isLoading = false;
+    });
+  } catch (e) {
+    print('Error loading expenditures: $e');
+    setState(() => _isLoading = false);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load expenditures: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
+}
 
-  void _navigateToAddPage() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const AddExpenditurePage(),
-      ),
-    );
+void _navigateToAddPage() async {
+  final result = await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const AddExpenditurePage(),
+    ),
+  );
 
-    if (result != null) {
-      try {
-        final User? currentUser = _auth.currentUser;
-        if (currentUser == null) return;
+  if (result == true) {
+    // Reload expenditures from Firestore
+    await _loadExpenditures();
 
-        // Add uid as foreign key
-        result['uid'] = currentUser.uid;
-
-        // Add to Firebase (eid will be auto-generated as document ID)
-        final docRef = await _firestore.collection('expenditure').add(result);
-
-        // Reload expenditures
-        await _loadExpenditures();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Expenditure added successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } catch (e) {
-        print('Error adding expenditure: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to add expenditure: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Expenditure added successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
     }
   }
+}
 
   void _navigateToEditPage(Transaction transaction) async {
     final result = await Navigator.push(
@@ -195,107 +167,86 @@ class _ManageExpenditurePageState extends State<ManageExpenditurePage> {
           category: transaction.category,
           dateTime: transaction.dateTime,
           merchant: transaction.merchant,
-          uid: transaction.uid,
         ),
       ),
     );
 
-    if (result != null) {
-      try {
-        // Update in Firebase using eid as document ID (primary key)
-        await _firestore
-            .collection('expenditure')
-            .doc(result['eid'])
-            .update({
-          'dateTime': Timestamp.fromDate(result['dateTime']),
-          'title': result['title'],
-          'details': result['details'],
-          'amount': result['amount'],
-          'category': result['category'],
-          'merchant': result['merchant'],
-          // uid should not be updated (foreign key remains the same)
-        });
+    if (result == true) {
+      // Reload expenditures from Firestore
+      await _loadExpenditures();
 
-        // Reload expenditures
-        await _loadExpenditures();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Expenditure updated successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } catch (e) {
-        print('Error updating expenditure: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to update expenditure: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Expenditure updated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     }
   }
 
-  void _showDeleteDialog(Transaction transaction) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Delete Expenditure'),
-          content: Text('Are you sure you want to delete "${transaction.title}"? This action cannot be undone.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                try {
-                  // Delete from Firebase using eid as document ID (primary key)
-                  await _firestore
-                      .collection('expenditure')
-                      .doc(transaction.eid)
-                      .delete();
 
-                  // Reload expenditures
-                  await _loadExpenditures();
+void _showDeleteDialog(Transaction transaction) {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: const Text('Delete Expenditure'),
+        content: Text(
+          'Are you sure you want to delete "${transaction.title}"? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              try {
+                final User? currentUser = _auth.currentUser;
+                if (currentUser == null) return;
 
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Expenditure deleted successfully!'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  print('Error deleting expenditure: $e');
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Failed to delete expenditure: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
+                await _firestore
+                    .collection('users')
+                    .doc(currentUser.uid)
+                    .collection('expenditures')
+                    .doc(transaction.eid)
+                    .delete();
+
+                await _loadExpenditures();
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Expenditure deleted successfully!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
                 }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-              ),
-              child: const Text('Delete', style: TextStyle(color: Colors.white)),
+              } catch (e) {
+                print('Error deleting expenditure: $e');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to delete expenditure: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
             ),
-          ],
-        );
-      },
-    );
-  }
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      );
+    },
+  );
+}
 
   void _showFilterDialog() {
     String tempSortBy = _sortBy;
@@ -533,6 +484,7 @@ class _ManageExpenditurePageState extends State<ManageExpenditurePage> {
           'Manage Expenditures',
           style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w600),
         ),
+        centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_outlined, color: Colors.black),

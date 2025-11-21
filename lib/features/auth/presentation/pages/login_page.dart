@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:gacha_guard/route.dart';
-import 'package:gacha_guard/services/auth_method.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:gacha_guard/features/auth/presentation/pages/signup_page.dart';
 import 'package:gacha_guard/features/home/home_page.dart';
@@ -67,8 +66,8 @@ class _LoginPageState extends State<LoginPage> {
         
         content: ConstrainedBox(
           constraints: const BoxConstraints(
-            maxHeight: 130, // control vertical size
-            maxWidth: 350,  // prevent extra width
+            maxHeight: 130, 
+            maxWidth: 350,  
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
