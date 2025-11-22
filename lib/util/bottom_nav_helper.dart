@@ -11,7 +11,7 @@ class BottomNavHelper extends StatelessWidget {
   const BottomNavHelper({super.key, required this.currentIndex});
 
   void _onItemTapped(BuildContext context, int index) {
-    if (index == currentIndex) return; // do nothing if already on that page
+    if (index == currentIndex) return;
 
     Widget destination;
     switch (index) {

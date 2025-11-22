@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:gacha_guard/route.dart';
-import 'package:gacha_guard/services/auth_method.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:gacha_guard/features/auth/presentation/pages/signup_page.dart';
 import 'package:gacha_guard/features/home/home_page.dart';
@@ -28,13 +27,13 @@ class _LoginPageState extends State<LoginPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
+  //auth cubit
+  late final authcubit = context.read<AuthCubit>();
+
   void login(){
     //prepare email and pw
     final String email = emailController.text;
     final String pw = passwordController.text;
-
-    //auth cubit
-    final authcubit = context.read<AuthCubit>();
 
     //ensure that the fields are filled 
     if (email.isNotEmpty && pw.isNotEmpty) {
@@ -48,30 +47,116 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> _signUpWithGoogle() async {
-    setState(() => _isLoading = true);
+// forgot password box
+  void openForgotPasswordBox() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        //forgot password
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        backgroundColor: const Color(0xFFF5EFFB), 
+        title: const Text(
+          "Forgot Password",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        //email
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxHeight: 130, 
+            maxWidth: 350,  
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: CustomTextField(
+              controller: emailController,
+              hintText: "Enter email",
+              label: "Email",
+              icon: Icons.email,
+            ),
+          ),
+        ),
+        actionsPadding: const EdgeInsets.only(bottom: 10, right: 10),
+        actionsAlignment: MainAxisAlignment.end,
+        //cancel
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              "Cancel",
+              style: TextStyle(
+                color: Colors.purple,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              // empty Email validation
+                if (emailController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter your email'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
+                //length email validation
+                if (emailController.text.length > 255) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Email is too long'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
+                //email structure validation
+                final emailRegex = RegExp(r'^[^@]+@[^@]+$');
+                if (!emailRegex.hasMatch(emailController.text)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter a valid email'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
+              String message =
+                  await authcubit.forgotPassword(emailController.text);
 
-    try {
-      final userCredential = await GoogleSignInService.signInWithGoogle();
+              if (!context.mounted) return;
 
-      if (!mounted) return;
+              if (message == "Password reset email: Check Your Email.") {
+                Navigator.pop(context);
+                emailController.clear();
+              }
 
-      if (userCredential != null) {
-        NavigationHelper.pushReplacement(context, const HomePage());
-        print('User Signed In: ${userCredential.user?.displayName}');
-      }
-    } catch (e) {
-      if (!mounted) return;
-      showSnackBar(
-        context: context,
-        type: SnackBarType.error,
-        description: "Google Login Failed",
-      );
-      print('Login Error: $e');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(message),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            child: const Text(
+              "Reset",
+              style: TextStyle(
+                color: Colors.purple,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
+
 
   @override
   void dispose() {
@@ -175,7 +260,7 @@ class _LoginPageState extends State<LoginPage> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () {},
+                              onPressed: () => openForgotPasswordBox(),
                               child: const Text(
                                 'Forgot Password?',
                                 style: TextStyle(
@@ -193,12 +278,15 @@ class _LoginPageState extends State<LoginPage> {
                             onPressed: login,
                           ),
 
+                          //google login
                           const SizedBox(height: 20),
                           SizedBox(
                             width: double.infinity,
                             height: 50,
                             child: OutlinedButton.icon(
-                              onPressed: _isLoading ? null : _signUpWithGoogle,
+                              onPressed: () async {
+                                authcubit.signInWithGoogle();
+                              },
                               icon: Image.asset(
                                 'assets/images/google_icon.png',
                                 height: 24,

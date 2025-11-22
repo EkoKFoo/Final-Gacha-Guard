@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:gacha_guard/services/auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:gacha_guard/route.dart';
-import 'package:gacha_guard/features/budget/budget_page.dart';
-import 'package:gacha_guard/features/expenditure/manage_expenditure_page.dart';
-import 'package:gacha_guard/features/insights/insights_page.dart';
-import 'package:gacha_guard/features/profile/profile_page.dart';
-import 'package:gacha_guard/features/auth/presentation/pages/login_page.dart';
 import 'package:gacha_guard/util/bottom_nav_helper.dart';
 import 'package:gacha_guard/features/auth/presentation/cubits/auth_cubit.dart';
+import 'package:gacha_guard/features/auth/presentation/pages/auth_page.dart';
+import 'package:gacha_guard/features/profile/profile_information_page.dart';
+import 'package:gacha_guard/features/profile/change_password_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -20,13 +16,6 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  int _selectedIndex = 4;
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +69,14 @@ class _ProfilePageState extends State<ProfilePage> {
                 icon: Icons.person_outline,
                 title: 'Profile Information',
                 subtitle: 'Manage your name, email, and personal details.',
-                onTap: () {},
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProfileInformationPage(),
+                    ),
+                  );
+                },
                 hasArrow: true,
               ),
               const SizedBox(height: 32),
@@ -97,7 +93,14 @@ class _ProfilePageState extends State<ProfilePage> {
                 icon: Icons.lock_outline,
                 title: 'Change Password',
                 subtitle: "Update your account's security password.",
-                onTap: () {},
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ChangePasswordPage(),
+                    ),
+                  );
+                },
                 hasArrow: true,
               ),
               const SizedBox(height: 32),
@@ -298,6 +301,12 @@ class _ProfilePageState extends State<ProfilePage> {
               Navigator.pop(context);
               final authCubit = context.read<AuthCubit>();
               authCubit.logout();
+
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const AuthPage()),
+                (route) => false,
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFD32F2F),
@@ -318,54 +327,212 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _showDeleteDialog() {
+    final passwordController = TextEditingController();
+    bool isDeleting = false;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: const Text(
-          'Delete Account',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-            color: Color(0xFFD32F2F),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-        ),
-        content: const Text(
-          'This action is permanent and cannot be undone. All your data will be lost. Are you sure?',
-          style: TextStyle(fontSize: 15),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontWeight: FontWeight.w600,
-              ),
+          title: const Text(
+            'Delete Account',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 18,
+              color: Color(0xFFD32F2F),
             ),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Add delete account logic here
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD32F2F),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'This action is permanent and cannot be undone. All your data will be lost.',
+                style: TextStyle(fontSize: 15, height: 1.5),
               ),
-            ),
-            child: const Text(
-              'Delete',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 20),
+              const Text(
+                'Please enter your password to confirm:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  hintText: 'Password',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFFD32F2F), width: 2),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: isDeleting ? null : () {
+                passwordController.dispose();
+                Navigator.pop(dialogContext);
+              },
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: isDeleting ? null : () async {
+                if (passwordController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter your password'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                setState(() => isDeleting = true);
+
+                try {
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user == null || user.email == null) {
+                    throw Exception('No user logged in');
+                  }
+
+                  // Re-authenticate user
+                  final credential = EmailAuthProvider.credential(
+                    email: user.email!,
+                    password: passwordController.text,
+                  );
+                  await user.reauthenticateWithCredential(credential);
+
+                  final firestore = FirebaseFirestore.instance;
+
+                  // Delete expenditures subcollection
+                  final expenditures = await firestore
+                      .collection('users')
+                      .doc(user.uid)
+                      .collection('expenditures')
+                      .get();
+                  for (var doc in expenditures.docs) {
+                    await doc.reference.delete();
+                  }
+
+                  // Delete budget subcollection
+                  final budgets = await firestore
+                      .collection('users')
+                      .doc(user.uid)
+                      .collection('budget')
+                      .doc('main')
+                      .delete();
+
+                  // Delete alerts subcollection
+                  final alerts = await firestore
+                      .collection('users')
+                      .doc(user.uid)
+                      .collection('alerts')
+                      .get();
+                  for (var doc in alerts.docs) {
+                    await doc.reference.delete();
+                  }
+
+                  // Delete main user document
+                  await firestore.collection('users').doc(user.uid).delete();
+
+                  // Delete Firebase Auth user
+                  await user.delete();
+
+                  // Close dialog
+                  passwordController.dispose();
+                  Navigator.pop(dialogContext);
+
+                  // Logout and navigate to auth page
+                  final authCubit = context.read<AuthCubit>();
+                  authCubit.logout();
+
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AuthPage()),
+                    (route) => false,
+                  );
+
+                  // Show success message on new page
+                  Future.delayed(const Duration(milliseconds: 500), () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Account deleted successfully'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  });
+
+                } on FirebaseAuthException catch (e) {
+                  setState(() => isDeleting = false);
+                  String message;
+                  switch (e.code) {
+                    case 'wrong-password':
+                      message = 'Incorrect password';
+                      break;
+                    case 'requires-recent-login':
+                      message = 'Please logout and login again before deleting account';
+                      break;
+                    default:
+                      message = 'Error: ${e.message}';
+                  }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(message),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                } catch (e) {
+                  setState(() => isDeleting = false);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error deleting account: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD32F2F),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: isDeleting
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      'Delete',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
