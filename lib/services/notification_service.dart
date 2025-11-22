@@ -19,8 +19,7 @@ class NotificationService {
   static const int highRiskNotificationId = 2;
   static const int timeDelayNotificationId = 3;
 
-  //INIT
-
+  //initialize
   Future<void> init() async {
     if (_initialized || kIsWeb) return;
 
@@ -43,8 +42,7 @@ class NotificationService {
     return await _notifications.getNotificationAppLaunchDetails();
   }
 
-  // NOTIFICATION TAP
-
+  // notification tap
   static void onNotificationTapped(NotificationResponse response) {
     if (response.payload == null) return;
     handlePayload(response.payload!);
@@ -65,8 +63,7 @@ class NotificationService {
     });
   }
 
-  //PERMISSIONS
-
+  //permission
   Future<void> requestPermissions() async {
     if (kIsWeb) return;
 
@@ -88,8 +85,7 @@ class NotificationService {
     if (!alarm.isGranted) print("Exact alarm not granted");
   }
 
-  //SHOW NOTIFICATIONS
-
+  //show overspending notifications
   Future<void> showOverspendingAlert(String title, String body) async {
     await init();
 
@@ -111,7 +107,7 @@ class NotificationService {
       payload: 'overspending',
     );
   }
-
+  //notificaiton id
   Future<void> showNotificationWithId(int id, String title, String body) async {
     await init();
 
@@ -154,7 +150,6 @@ class NotificationService {
   }
 
   //CANCEL
-
   Future<void> cancelNotification(int id) async {
     await _notifications.cancel(id);
   }

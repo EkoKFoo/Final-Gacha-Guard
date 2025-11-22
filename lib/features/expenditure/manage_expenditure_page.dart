@@ -217,24 +217,19 @@ void _showDeleteDialog(Transaction transaction) {
 
                 await _loadExpenditures();
 
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Expenditure deleted successfully!'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Expenditure deleted successfully!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
               } catch (e) {
-                print('Error deleting expenditure: $e');
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(this.context).showSnackBar(
                     SnackBar(
-                      content: Text('Failed to delete expenditure: $e'),
+                      content: Text('Failed to delete expenditure.'),
                       backgroundColor: Colors.red,
                     ),
                   );
-                }
               }
             },
             style: ElevatedButton.styleFrom(

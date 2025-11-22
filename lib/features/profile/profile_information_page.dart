@@ -48,7 +48,7 @@ class _ProfileInformationPageState extends State<ProfileInformationPage> {
       setState(() => _isLoading = false);
     }
   }
-
+  //save profile
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -124,36 +124,6 @@ class _ProfileInformationPageState extends State<ProfileInformationPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Center(
-                        child: Stack(
-                          children: [
-                            CircleAvatar(
-                              radius: 50,
-                              backgroundColor: Colors.grey.shade300,
-                              backgroundImage: const NetworkImage(
-                                'https://via.placeholder.com/150',
-                              ),
-                            ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF6750A4),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 2),
-                                ),
-                                child: const Icon(
-                                  Icons.camera_alt,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                       const SizedBox(height: 40),
                       const Text(
                         'Personal Information',
@@ -172,6 +142,9 @@ class _ProfileInformationPageState extends State<ProfileInformationPage> {
                           if (value == null || value.isEmpty) {
                             return 'Please enter your name';
                           }
+                          if (value.length > 255) {
+                            return 'Name cannot exceed 255 characters';
+                            }
                           return null;
                         },
                       ),
@@ -189,6 +162,12 @@ class _ProfileInformationPageState extends State<ProfileInformationPage> {
                         label: 'Phone Number (Optional)',
                         icon: Icons.phone_outlined,
                         keyboardType: TextInputType.phone,
+                        validator: (value) {
+                          if (value != null && value.length > 30) {
+                            return 'Phone number cannot exceed 30 characters';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 40),
                       SizedBox(

@@ -11,7 +11,7 @@ class SpendingAnalysisService {
   // Notification IDs
   static const int overspendingNotificationId = 1;
 
-  /// Triggers IMMEDIATE overspending alerts
+  /// Triggers overspending alerts
   Future<void> checkBudgetOnTransaction(String uid) async {
     try {
       final budgetRef = _firestore

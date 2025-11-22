@@ -52,6 +52,7 @@ class _LoginPageState extends State<LoginPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        //forgot password
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
@@ -63,7 +64,7 @@ class _LoginPageState extends State<LoginPage> {
             fontSize: 18,
           ),
         ),
-        
+        //email
         content: ConstrainedBox(
           constraints: const BoxConstraints(
             maxHeight: 130, 
@@ -81,6 +82,7 @@ class _LoginPageState extends State<LoginPage> {
         ),
         actionsPadding: const EdgeInsets.only(bottom: 10, right: 10),
         actionsAlignment: MainAxisAlignment.end,
+        //cancel
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -94,6 +96,37 @@ class _LoginPageState extends State<LoginPage> {
           ),
           TextButton(
             onPressed: () async {
+              // empty Email validation
+                if (emailController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter your email'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
+                //length email validation
+                if (emailController.text.length > 255) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Email is too long'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
+                //email structure validation
+                final emailRegex = RegExp(r'^[^@]+@[^@]+$');
+                if (!emailRegex.hasMatch(emailController.text)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter a valid email'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
               String message =
                   await authcubit.forgotPassword(emailController.text);
 

@@ -75,7 +75,7 @@ class _BudgetPageState extends State<BudgetPage> {
 
   void _updateBudgetFromTextField(String value) {
     final parsedValue = double.tryParse(value);
-    if (parsedValue != null && parsedValue >= 0 && parsedValue <= 100000) {
+    if (parsedValue != null && parsedValue >= 0 && parsedValue <= 999999) {
       setState(() {
         _budgetAmount = parsedValue;
       });
@@ -135,6 +135,26 @@ class _BudgetPageState extends State<BudgetPage> {
       );
       return;
     }
+    //check if budget is over limit
+    if(_budgetAmount > 999999){
+      ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Cannot save! Budget exceeds RM999,999.'),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return;
+    }
+    //check for negative budget
+    if(_budgetAmount < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Budget cannot be negative'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     try {
       final startDate = _calculateStartDate();
@@ -145,7 +165,7 @@ class _BudgetPageState extends State<BudgetPage> {
           .collection('users')
           .doc(_uid)
           .collection('budget')
-          .doc('main'); // only one budget per user
+          .doc('main');
 
       final budgetDoc = await budgetRef.get();
 
@@ -305,7 +325,7 @@ class _BudgetPageState extends State<BudgetPage> {
                           child: Slider(
                             value: _budgetAmount,
                             min: 0,
-                            max: 100000,
+                            max: 999999,
                             onChanged: _updateBudgetFromSlider,
                           ),
                         ),
