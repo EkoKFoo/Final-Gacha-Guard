@@ -18,7 +18,7 @@ class ScheduledNotificationService {
     _initializeTimezone();
   }
 
-  // Notification IDs
+  // Notification id
   static const int highRiskNotificationId = 2;
   static const int timeDelayNotificationId = 3;
 
@@ -56,7 +56,7 @@ class ScheduledNotificationService {
           .get();
 
       if (expenditures.docs.length < 5) {
-        print('ℹ️ Not enough transactions (need 5+) for notifications');
+        print('Not enough transactions (need 5+) for notifications');
         return;
       }
 
@@ -121,7 +121,7 @@ class ScheduledNotificationService {
         highRiskTime = highRiskTime.add(const Duration(days: 1));
       }
 
-      // Schedule High-Risk notification with insights_page payload
+      // Schedule High-Risk notification
       await scheduleNotification(
         id: highRiskNotificationId,
         scheduledDate: highRiskTime,
@@ -133,7 +133,7 @@ class ScheduledNotificationService {
         payload: 'insights_page',
       );
 
-      // ✅ Schedule Time-Delay notification 5 seconds after high-risk
+      //Schedule Time-Delay notification 5 seconds after high-risk
       final timeDelayTime = highRiskTime.add(const Duration(seconds: 5));
       await scheduleNotification(
         id: timeDelayNotificationId,
@@ -146,8 +146,8 @@ class ScheduledNotificationService {
         payload: 'insights_page',
       );
 
-      print('✅ High-risk scheduled at $highRiskTime');
-      print('✅ Time-delay scheduled at $timeDelayTime');
+      print('High-risk scheduled at $highRiskTime');
+      print('Time-delay scheduled at $timeDelayTime');
     } catch (e) {
       print(' Error scheduling notifications: $e');
     }

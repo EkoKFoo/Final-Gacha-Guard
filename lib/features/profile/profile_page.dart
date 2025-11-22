@@ -16,13 +16,6 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  int _selectedIndex = 4;
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -444,12 +437,10 @@ class _ProfilePageState extends State<ProfilePage> {
                       .collection('users')
                       .doc(user.uid)
                       .collection('budget')
-                      .get();
-                  for (var doc in budgets.docs) {
-                    await doc.reference.delete();
-                  }
+                      .doc('main')
+                      .delete();
 
-                  // Delete alerts subcollection if exists
+                  // Delete alerts subcollection
                   final alerts = await firestore
                       .collection('users')
                       .doc(user.uid)

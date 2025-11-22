@@ -89,14 +89,14 @@ class _EditExpenditurePageState extends State<EditExpenditurePage> {
 
 void _updateTransaction() async {
   if (!_formKey.currentState!.validate()) return;
-
+  //category validation
   if (_selectedCategory == null) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Please select a category")),
     );
     return;
   }
-
+  
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -138,10 +138,6 @@ void _updateTransaction() async {
     await SpendingAnalysisService().checkBudgetOnTransaction(user.uid);
     await SpendingAnalysisService().updateScheduledNotifications(user.uid);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Transaction updated successfully!")),
-    );
-
     if (mounted) Navigator.of(context).pop(true);
   } catch (e) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -180,8 +176,11 @@ void _updateTransaction() async {
               TextFormField(
                 controller: _titleController,
                 decoration: _inputDecoration('e.g., Battle Pass'),
-                validator: (value) =>
-                    value?.isEmpty ?? true ? 'Please enter a title' : null,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Please enter a title';
+                  if (value.length > 255) return 'Title cannot exceed 255 characters';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
 
@@ -191,6 +190,12 @@ void _updateTransaction() async {
                 controller: _detailsController,
                 maxLines: 3,
                 decoration: _inputDecoration('e.g., Genshin Impact Battle Pass'),
+                validator: (value) {
+                   if (value != null && value.length > 255) {
+                    return 'Details cannot exceed 255 characters';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
 
@@ -201,9 +206,11 @@ void _updateTransaction() async {
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: _inputDecoration('0.00'),
                 validator: (value) {
-                  if (value?.isEmpty ?? true) return 'Please enter an amount';
-                  if (double.tryParse(value!) == null) return 'Enter a valid number';
-                  if (double.parse(value) <= 0) return 'Amount must be > 0';
+                  if (value == null || value.isEmpty) return 'Please enter an amount';
+                  final parsed = double.tryParse(value);
+                  if (parsed == null) return 'Enter a valid number';
+                  if (parsed <= 0) return 'Amount must be > 0';
+                  if (parsed > 999999) return 'Amount cannot exceed RM999,999';
                   return null;
                 },
               ),
@@ -214,6 +221,11 @@ void _updateTransaction() async {
               TextFormField(
                 controller: _merchantController,
                 decoration: _inputDecoration('e.g., Google Play Store'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Please enter a merchant';
+                  if (value.length > 255) return 'Merchant cannot exceed 255 characters';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
 

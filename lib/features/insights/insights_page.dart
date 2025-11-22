@@ -28,7 +28,7 @@ class _InsightsPageState extends State<InsightsPage> {
   void initState() {
     super.initState();
 
-    // Initialize YouTube player safely
+    // Initialize YouTube player
     _youtubeController = YoutubePlayerController(
       initialVideoId: '1EE-3lk0_7M',
       flags: const YoutubePlayerFlags(
@@ -42,7 +42,7 @@ class _InsightsPageState extends State<InsightsPage> {
           });
         }
       });
-
+    //load user data
     _loadUserData();
   }
 
@@ -53,6 +53,7 @@ class _InsightsPageState extends State<InsightsPage> {
   }
 
   Future<void> _loadUserData() async {
+    //get current user
     final user = _auth.currentUser;
     if (user == null) return;
 
@@ -63,11 +64,11 @@ class _InsightsPageState extends State<InsightsPage> {
           .collection('budget')
           .doc('main')
           .get();
-
+      //get if budget exist
       if (budgetDoc.exists) {
         _budgetLimit = budgetDoc['budgetLimit'] ?? 0.0;
       }
-
+      //get user expenditure data
       final expenditureSnapshot = await _firestore
           .collection('users')
           .doc(user.uid)
@@ -90,9 +91,9 @@ class _InsightsPageState extends State<InsightsPage> {
       });
     }
   }
-
+  //check spending ratio
   double get spendingRatio => _budgetLimit > 0 ? _totalSpent / _budgetLimit : 0;
-
+  //give out recommendations depending on user spending ratio
   List<Map<String, String>> getRecommendations() {
     if (spendingRatio < 0.5) {
       return [

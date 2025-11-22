@@ -164,8 +164,11 @@ class _AddExpenditurePageState extends State<AddExpenditurePage> {
                   TextFormField(
                     controller: _titleController,
                     decoration: _inputDecoration('e.g., Battle Pass'),
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? 'Please enter a title' : null,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Please enter a title';
+                      if (value.length > 255) return 'Title cannot exceed 255 characters';
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
 
@@ -174,10 +177,13 @@ class _AddExpenditurePageState extends State<AddExpenditurePage> {
                   TextFormField(
                     controller: _detailsController,
                     maxLines: 3,
-                    decoration:
-                        _inputDecoration('e.g., Genshin Impact Battle Pass'),
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? 'Please enter details' : null,
+                    decoration: _inputDecoration('e.g., Genshin Impact Battle Pass'),
+                    validator: (value) {
+                      if (value != null && value.length > 255) {
+                        return 'Details cannot exceed 255 characters';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
 
@@ -189,11 +195,11 @@ class _AddExpenditurePageState extends State<AddExpenditurePage> {
                         const TextInputType.numberWithOptions(decimal: true),
                     decoration: _inputDecoration('0.00'),
                     validator: (value) {
-                      if (value?.isEmpty ?? true) return 'Please enter an amount';
-                      if (double.tryParse(value!) == null)
-                        return 'Please enter a valid number';
-                      if (double.parse(value) <= 0)
-                        return 'Amount must be greater than 0';
+                      if (value == null || value.isEmpty) return 'Please enter an amount';
+                      final parsed = double.tryParse(value);
+                      if (parsed == null) return 'Enter a valid number';
+                      if (parsed <= 0) return 'Amount must be > 0';
+                      if (parsed > 999999) return 'Amount cannot exceed RM999,999';
                       return null;
                     },
                   ),
@@ -205,8 +211,11 @@ class _AddExpenditurePageState extends State<AddExpenditurePage> {
                     controller: _merchantController,
                     decoration:
                         _inputDecoration('e.g., Google Play Store'),
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? 'Please enter merchant' : null,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Please enter a merchant';
+                      if (value.length > 255) return 'Merchant cannot exceed 255 characters';
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 32),
 
