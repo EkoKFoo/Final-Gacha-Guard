@@ -1,6 +1,6 @@
 # gacha_guard
 
-A new Flutter project.
+A budget tracker for gacha gamers
 
 ## Getting Started
 
