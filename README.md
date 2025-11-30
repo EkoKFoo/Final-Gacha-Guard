@@ -10,7 +10,7 @@ Guide to run the app:
 5: Then Create a Virtual Device
 6: It the IDE, make sure it can run the emulator
 7: Then type "flutter pub get" in the terminal
-8: flutter devices to check if the emulator is detected
+8: type "flutter devices" in the terminal to check if the emulator is detected
 9: Then type "flutter run" in the terminal.
 
 ## Getting Started
