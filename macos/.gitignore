@@ -5,3 +5,7 @@
 # Xcode-related
 **/dgph
 **/xcuserdata/
+
+#firebase
+Flutter/Runner/GoogleService-Info.plist
+Flutter/Runner/Info.plist
