@@ -225,6 +225,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF6750A4),
+              foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
